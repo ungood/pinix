@@ -11,11 +11,10 @@
 Core extension that manages workspaces and repos.
 
 - [x] Extension skeleton — loads in pi, registers commands and tools
-- [x] `/ws` — list workspaces and their repos
-- [x] `/ws-create <name>` — create a workspace directory
-- [x] `/ws-add <workspace> <url> [name]` — clone a repo into a workspace
+- [x] `/workspace:list` — list workspaces and their repos
+- [x] `/workspace:create <name>` — create a workspace directory
+- [x] `/workspace:add <workspace> <url> [name]` — clone a repo into a workspace
 - [x] `workspace` tool — LLM-callable workspace operations (list, create, add, status)
-- [x] Status bar — show workspace summary on session start
 - [x] Test: run from a workspaces root, create a workspace, add repos, verify status
 
 ## Milestone 2: Worktree management
@@ -37,6 +36,7 @@ Spin up pi workers in tmux panes.
 
 ## Later
 
+- [ ] Status bar showing workspace summary
 - [ ] Task tracking (files in repo, TODO.md, or similar)
 - [ ] Autonomy controls per-worker
 - [ ] Session logging and review

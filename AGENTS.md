@@ -22,7 +22,7 @@ cd ~/workspaces
 pi -e ./pinix/extension/index.ts
 ```
 
-Then use `/ws`, `/ws-create`, `/ws-add` commands or let the LLM use the `workspace` tool.
+Then use `/workspace:list`, `/workspace:create`, `/workspace:add` commands or let the LLM use the `workspace` tool.
 
 ## Status
 

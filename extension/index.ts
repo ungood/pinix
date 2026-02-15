@@ -60,7 +60,7 @@ async function scanWorkspace(pi: ExtensionAPI, workspacePath: string): Promise<W
 	return { name, path: workspacePath, repos };
 }
 
-/** List workspace directories (subdirectories of cwd that contain at least one git repo) */
+/** List workspace directories (all non-hidden subdirectories of cwd) */
 async function listWorkspaces(pi: ExtensionAPI, cwd: string): Promise<WorkspaceInfo[]> {
 	const workspaces: WorkspaceInfo[] = [];
 	const entries = fs.readdirSync(cwd, { withFileTypes: true });
@@ -68,9 +68,7 @@ async function listWorkspaces(pi: ExtensionAPI, cwd: string): Promise<WorkspaceI
 	for (const entry of entries) {
 		if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
 		const ws = await scanWorkspace(pi, path.join(cwd, entry.name));
-		if (ws.repos.length > 0) {
-			workspaces.push(ws);
-		}
+		workspaces.push(ws);
 	}
 
 	return workspaces;
@@ -90,7 +88,7 @@ export default function (pi: ExtensionAPI) {
 		description: [
 			"Manage workspaces and git repositories.",
 			"Actions:",
-			"  list — list all workspaces (directories containing git repos)",
+			"  list — list all workspaces (subdirectories of the workspaces root)",
 			"  create <name> — create a new workspace directory",
 			"  add <url> [workspace] [name] — clone a repo into a workspace",
 			"  status [workspace] — show repo status in a workspace",
@@ -113,9 +111,10 @@ export default function (pi: ExtensionAPI) {
 							content: [{ type: "text", text: "No workspaces found. Create one with action: create" }],
 						};
 					}
-					const lines = workspaces.map(
-						(ws) => `${ws.name}/\n${ws.repos.map((r) => `  ${formatRepoStatus(r)}`).join("\n")}`
-					);
+					const lines = workspaces.map((ws) => {
+						if (ws.repos.length === 0) return `${ws.name}/ (empty)`;
+						return `${ws.name}/\n${ws.repos.map((r) => `  ${formatRepoStatus(r)}`).join("\n")}`;
+					});
 					return { content: [{ type: "text", text: lines.join("\n\n") }] };
 				}
 
@@ -178,7 +177,7 @@ export default function (pi: ExtensionAPI) {
 
 	// --- Slash commands for humans ---
 
-	pi.registerCommand("ws", {
+	pi.registerCommand("workspace:list", {
 		description: "List workspaces and their repos",
 		handler: async (_args, ctx) => {
 			const workspaces = await listWorkspaces(pi, ctx.cwd);
@@ -186,19 +185,20 @@ export default function (pi: ExtensionAPI) {
 				ctx.ui.notify("No workspaces found", "info");
 				return;
 			}
-			const lines = workspaces.map(
-				(ws) => `${ws.name}/\n${ws.repos.map((r) => `  ${formatRepoStatus(r)}`).join("\n")}`
-			);
+			const lines = workspaces.map((ws) => {
+				if (ws.repos.length === 0) return `${ws.name}/ (empty)`;
+				return `${ws.name}/\n${ws.repos.map((r) => `  ${formatRepoStatus(r)}`).join("\n")}`;
+			});
 			ctx.ui.notify(lines.join("\n\n"), "info");
 		},
 	});
 
-	pi.registerCommand("ws-create", {
-		description: "Create a new workspace: /ws-create <name>",
+	pi.registerCommand("workspace:create", {
+		description: "Create a new workspace: /workspace:create <name>",
 		handler: async (args, ctx) => {
 			const name = args?.trim();
 			if (!name) {
-				ctx.ui.notify("Usage: /ws-create <name>", "error");
+				ctx.ui.notify("Usage: /workspace:create <name>", "error");
 				return;
 			}
 			const wsPath = path.join(ctx.cwd, name);
@@ -211,12 +211,12 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
-	pi.registerCommand("ws-add", {
-		description: "Clone a repo into a workspace: /ws-add <workspace> <repo-url> [name]",
+	pi.registerCommand("workspace:add", {
+		description: "Clone a repo into a workspace: /workspace:add <workspace> <repo-url> [name]",
 		handler: async (args, ctx) => {
 			const parts = args?.trim().split(/\s+/) || [];
 			if (parts.length < 2) {
-				ctx.ui.notify("Usage: /ws-add <workspace> <repo-url> [name]", "error");
+				ctx.ui.notify("Usage: /workspace:add <workspace> <repo-url> [name]", "error");
 				return;
 			}
 			const [workspace, url, ...rest] = parts;
@@ -239,19 +239,5 @@ export default function (pi: ExtensionAPI) {
 			}
 			ctx.ui.notify(`Cloned ${repoName} into ${workspace}/`, "success");
 		},
-	});
-
-	// --- Session start: show workspace overview ---
-
-	pi.on("session_start", async (_event, ctx) => {
-		const workspaces = await listWorkspaces(pi, ctx.cwd);
-		if (workspaces.length > 0) {
-			const summary = workspaces
-				.map((ws) => `${ws.name}/ (${ws.repos.length} repo${ws.repos.length === 1 ? "" : "s"})`)
-				.join(", ");
-			ctx.ui.setStatus("pinix", `📂 ${summary}`);
-		} else {
-			ctx.ui.setStatus("pinix", "📂 No workspaces");
-		}
 	});
 }
