@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PINIX_ROOT="$(cd "$(dirname "$0")" && pwd)"
 SESSION_NAME="${1:-pinix}"
 
 # Ensure we're in the nix dev shell
 if [ -z "${IN_NIX_SHELL:-}" ]; then
-    exec nix develop "${PINIX_ROOT}" --command env IN_NIX_SHELL=1 "$0" "$@"
+    exec nix develop --command env IN_NIX_SHELL=1 "$0" "$@"
 fi
 
 # If already inside the tmux session, just attach
@@ -19,5 +18,5 @@ fi
 if tmux has-session -t "${SESSION_NAME}" 2>/dev/null; then
     exec tmux attach-session -t "${SESSION_NAME}"
 else
-    exec tmux new-session -s "${SESSION_NAME}" -c "${PINIX_ROOT}" "pi"
+    exec tmux new-session -s "${SESSION_NAME}" "pi"
 fi

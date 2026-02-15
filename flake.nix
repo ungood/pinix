@@ -21,9 +21,7 @@
             coreutils
           ];
 
-          shellHook = ''
-            export PINIX_ROOT="$(pwd)"
-          '';
+
         };
       });
     };
