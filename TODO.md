@@ -16,7 +16,7 @@ Core extension that manages workspaces and repos.
 - [x] `/ws-add <workspace> <url> [name]` — clone a repo into a workspace
 - [x] `workspace` tool — LLM-callable workspace operations (list, create, add, status)
 - [x] Status bar — show workspace summary on session start
-- [ ] Test: run from a workspaces root, create a workspace, add repos, verify status
+- [x] Test: run from a workspaces root, create a workspace, add repos, verify status
 
 ## Milestone 2: Worktree management
 
