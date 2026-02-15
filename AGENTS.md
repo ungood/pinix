@@ -1,6 +1,6 @@
 # pinix
 
-A multi-agent, multi-repository orchestration layer built on [pi-coding-agent](https://github.com/badlogic/pi-mono) and [Nix](https://nixos.org/).
+A pi extension for multi-agent workspace management.
 
 ## Project Documents
 
@@ -9,28 +9,25 @@ A multi-agent, multi-repository orchestration layer built on [pi-coding-agent](h
 
 ## What is this?
 
-Pinix is a single entry point for coordinating multiple AI agents across multiple repositories. It combines:
+Pinix is a pi extension that manages workspaces — directories of git repositories where humans and AI agents collaborate. It provides:
 
-- **pi-coding-agent** — the agent runtime (extensions, tools, SDK, TUI)
-- **Nix** — reproducible environment definitions (flakes, shells)
-- **tmux** — terminal multiplexing and observability
-- **git** — state, coordination, and history
-
-Inspired by [gas-town](https://github.com/steveyegge/gastown) but built on existing tools instead of reinventing them, and with plain language instead of themed jargon.
+- **Workspace management** — create workspaces, clone repos, scan status
+- **Agent orchestration** — spin up pi workers in tmux panes (planned)
+- **Worktree management** — isolated branches for parallel agent work (planned)
 
 ## Quick Start
 
 ```bash
-./pinix          # starts tmux session with pi + human shell
-./pinix myname   # custom session name
+cd ~/workspaces
+pi -e ./pinix/extension/index.ts
 ```
 
-Requires [Nix](https://nixos.org/) with flakes enabled. The flake provides tmux and other tools; pi should be installed separately.
+Then use `/ws`, `/ws-create`, `/ws-add` commands or let the LLM use the `workspace` tool.
 
 ## Status
 
-Bootstrapping. See [TODO.md](TODO.md) for current progress.
+Building. See [TODO.md](TODO.md) for current progress.
 
 ## Contributing
 
-Read [PHILOSOPHY.md](PHILOSOPHY.md) before contributing. The core ideas: agents use human tools (CLIs, not protocols), humans review results not steps, compose existing tools don't reinvent them, and call things what they are.
+Read [PHILOSOPHY.md](PHILOSOPHY.md) before contributing.

@@ -4,89 +4,95 @@ Living document of architecture decisions for pinix.
 
 ## Overview
 
-Pinix is a single entry point for orchestrating multiple AI agents across multiple repositories. It combines pi-coding-agent (the agent runtime) with Nix (reproducible environments) and tmux (terminal multiplexing).
+Pinix is a pi extension for managing workspaces — collections of git repositories where humans and AI agents collaborate. You run pi from a workspaces root directory with pinix loaded, and it handles repo management, worktrees for parallel agent work, and tmux panes for multi-agent orchestration.
 
 ```
-┌─────────────────────────────────────────────┐
-│  pinix                                      │
-│  ┌───────────────────────────────────────┐  │
-│  │  tmux session                         │  │
-│  │  ┌─────────┐ ┌─────────┐ ┌────────┐  │  │
-│  │  │ env: A  │ │ env: B  │ │ human  │  │  │
-│  │  │ (nix)   │ │ (nix)   │ │ shell  │  │  │
-│  │  │         │ │         │ │        │  │  │
-│  │  │ pi ───► │ │ pi ───► │ │        │  │  │
-│  │  │ worker  │ │ worker  │ │        │  │  │
-│  │  │ worker  │ │ worker  │ │        │  │  │
-│  │  └─────────┘ └─────────┘ └────────┘  │  │
-│  └───────────────────────────────────────┘  │
-└─────────────────────────────────────────────┘
+~/workspaces/                    # run pi here with pinix extension
+├── my-project/                  # workspace
+│   ├── frontend/                # git clone
+│   │   ├── (main branch)
+│   │   └── .git/worktrees/
+│   │       └── feature-auth/    # agent worktree
+│   └── backend/                 # git clone
+├── pinix/                       # pinix source (also a workspace)
+│   └── extension/
+│       └── index.ts
+└── side-project/                # single-repo workspace
 ```
 
 ## Key Concepts
 
 | Concept | What it is | Implemented with |
 |---------|-----------|-----------------|
-| **Environment** | A reproducible shell with specific tools, context, and configuration for working in a git subtree | Nix shell (flake) |
-| **Worker** | A single pi-coding-agent instance performing tasks within an environment | pi SDK or CLI via tmux pane |
-| **Workspace** | A collection of environments, typically spanning multiple repositories | tmux session |
-| **Orchestrator** | The human (or a coordinating agent) that assigns work and reviews results | pinix CLI |
+| **Workspace** | A directory containing one or more git repos | Filesystem directory |
+| **Worker** | A pi instance performing tasks in a worktree | pi in a tmux pane |
+| **Workspaces root** | The directory pi is launched from | `ctx.cwd` |
+
+A workspace is discovered, not configured — any subdirectory of the workspaces root that contains git repos is a workspace. No metadata files.
 
 ## Decisions
 
-### ADR-001: Use tmux for agent multiplexing
+### ADR-001: Pinix is a pi extension
+
+**Status:** Accepted (replaces prior tmux-launcher approach)
+
+**Context:** Pinix needs to provide workspace management commands, LLM-callable tools, and status UI within a pi session.
+
+**Decision:** Pinix is a pi extension. It registers slash commands (`/ws`, `/ws-create`, `/ws-add`), tools (for LLM-driven workspace operations), and uses pi's event system for status display. No separate shell script or CLI.
+
+**Consequences:** Everything runs inside pi. Installation is `pi -e ./pinix/extension/index.ts` during development, or as a pi package when published. Pi's extension API handles commands, tools, UI, and lifecycle.
+
+### ADR-002: Workspaces are just directories
+
+**Status:** Accepted
+
+**Context:** We need to track which repos belong to which workspace.
+
+**Decision:** A workspace is a subdirectory of the workspaces root that contains at least one git repo. No `.pinix/` metadata directory, no config files. The filesystem is the source of truth.
+
+**Consequences:** Zero setup to create a workspace — `mkdir` is enough. Discovery is a directory scan. No state to get out of sync.
+
+### ADR-003: Clone to add, worktree to work
+
+**Status:** Accepted
+
+**Context:** Repos need to be added to workspaces, and agents need isolated working copies.
+
+**Decision:** Adding a repo to a workspace does a `git clone`. Agents do their work in `git worktree` branches off those clones. This separates the "canonical" clone from agent working copies.
+
+**Consequences:** Multiple agents can work on the same repo simultaneously without conflicts. The main clone stays on its primary branch. Worktrees are cheap and disposable.
+
+### ADR-004: Use tmux for agent multiplexing
 
 **Status:** Accepted
 
 **Context:** We need to run multiple agent instances concurrently with full observability.
 
-**Decision:** Each worker runs in a tmux pane. The human can attach to any pane to observe, steer, or intervene. No custom process management — tmux already handles sessions, windows, panes, logging, and detach/reattach.
+**Decision:** Each worker runs in a tmux pane, managed by the pinix extension via `pi.exec("tmux", ...)`. The human can attach to any pane to observe, steer, or intervene.
 
 **Consequences:** Requires tmux. Agents are fully observable. Standard tmux workflows apply (capture-pane, pipe-pane for logging, send-keys for input).
 
-### ADR-002: Use Nix for environment definitions
-
-**Status:** Accepted
-
-**Context:** Each agent may need different tools, language runtimes, credentials, and context files. These must be reproducible.
-
-**Decision:** Each environment is defined as a Nix shell (via flakes). The shell definition specifies packages, environment variables, AGENTS.md content, and pi configuration. Entering the environment is `nix develop`.
-
-**Consequences:** Environments are declarative, reproducible, and shareable. Users must have Nix installed. Environments can be version-controlled alongside the code they operate on.
-
-### ADR-003: Git as the coordination layer
+### ADR-005: Git as the coordination layer
 
 **Status:** Accepted
 
 **Context:** Multiple agents working on the same repository need to coordinate without stepping on each other.
 
-**Decision:** Agents work in git worktrees or branches. Coordination happens through the filesystem and git — not through a custom messaging protocol. Task state is tracked in files (markdown, JSON) within the repository.
+**Decision:** Agents work in git worktrees. Coordination happens through the filesystem and git — not through a custom messaging protocol. Task state is tracked in files within the repository.
 
-**Consequences:** All state is version-controlled. Standard git tools work for inspection and recovery. No custom database or message queue needed.
+**Consequences:** All state is version-controlled. Standard git tools work for inspection and recovery. No custom database or message queue.
 
-### ADR-004: Pi extensions over custom tooling
-
-**Status:** Accepted
-
-**Context:** We need agent capabilities beyond pi's defaults (coordination, reporting, environment awareness).
-
-**Decision:** Build pinix-specific capabilities as pi extensions. These extensions can register tools, react to events, and provide UI — all through pi's existing extension API.
-
-**Consequences:** We stay within pi's ecosystem. Extensions are shareable as pi packages. No fork of pi needed.
-
-### ADR-005: Plain language naming
+### ADR-006: Plain language naming
 
 **Status:** Accepted
 
-**Context:** Gas-town uses themed naming (Mayor, Polecats, Rigs, Beads, Hooks, MEOW) that requires a glossary to understand.
+**Decision:** Use descriptive, plain-language names. A workspace is a "workspace." A worker is a "worker." A task is a "task."
 
-**Decision:** Use descriptive, plain-language names. An environment is an "environment." A worker is a "worker." A task is a "task." Naming should be self-documenting.
-
-**Consequences:** Lower barrier to entry. Documentation is shorter. No glossary needed.
+**Consequences:** Lower barrier to entry. No glossary needed.
 
 ## Open Questions
 
-- How should task assignment and progress tracking work? Files in the repo? A shared TODO.md? Pi session metadata?
-- Should the orchestrator be a pi instance itself (agent-as-coordinator), or a separate CLI that manages pi instances?
-- What's the right granularity for environments — per-repo, per-task, per-team?
-- How do we handle credentials and secrets in Nix-defined environments?
+- How should task assignment and progress tracking work?
+- What's the right granularity for worktree lifecycle — per-task, per-agent, per-session?
+- Should the orchestrator be a pi instance itself, or the human in the main pi session?
+- How do we handle per-workspace environment needs (different tools, runtimes)?

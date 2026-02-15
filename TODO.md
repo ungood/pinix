@@ -1,37 +1,44 @@
 # TODO
 
-## Milestone 0: Bootstrap
-
-Get to the point where pinix is used to develop pinix.
+## Milestone 0: Bootstrap ✅
 
 - [x] Initialize git repo
-- [x] Create `flake.nix` with dev environment (pi, tmux, git, coreutils)
-- [x] Create `pinix` shell script — entry point that starts a tmux session with pi in the nix environment
-- [x] Add `.gitignore`
-- [x] Verify: run `./pinix` from the project root, get a tmux session with pi running, AGENTS.md loaded
-- [x] Dog-food: use the bootstrapped setup to continue development
+- [x] Verify: pi runs with pinix extension loaded
+- [x] Dog-food: use pinix to develop pinix
 
-## Milestone 1: Multi-environment basics
+## Milestone 1: Workspace management
 
-Define and launch multiple environments from a single config.
+Core extension that manages workspaces and repos.
 
-- [ ] Design environment config format (nix expressions? TOML? directory convention?)
-- [ ] Support launching multiple pi workers in separate tmux panes within one environment
-- [ ] Support multiple environments (multiple repos) in one tmux session
-- [ ] Human shell pane for manual work alongside agents
+- [x] Extension skeleton — loads in pi, registers commands and tools
+- [x] `/ws` — list workspaces and their repos
+- [x] `/ws-create <name>` — create a workspace directory
+- [x] `/ws-add <workspace> <url> [name]` — clone a repo into a workspace
+- [x] `workspace` tool — LLM-callable workspace operations (list, create, add, status)
+- [x] Status bar — show workspace summary on session start
+- [ ] Test: run from a workspaces root, create a workspace, add repos, verify status
 
-## Milestone 2: Coordination
+## Milestone 2: Worktree management
 
-Agents and humans working together on shared repositories.
+Agents work in git worktrees for isolation.
 
-- [ ] Task tracking mechanism (files in repo — TODO.md, task JSON, or similar)
-- [ ] Git worktree management for parallel agent work
-- [ ] Pi extension for environment/workspace awareness
-- [ ] Progress visibility from the orchestrator pane
+- [ ] `/ws-worktree <workspace/repo> <branch>` — create a worktree
+- [ ] `worktree` tool — LLM-callable worktree operations
+- [ ] List/clean worktrees per repo
+
+## Milestone 3: Multi-agent orchestration
+
+Spin up pi workers in tmux panes.
+
+- [ ] `/ws-spawn <workspace/repo> [branch]` — launch a pi worker in a tmux pane
+- [ ] Worker lifecycle management (start, stop, list)
+- [ ] Human can attach to any worker pane
+- [ ] Progress visibility from the main pi session
 
 ## Later
 
-- [ ] Autonomy controls per-environment (unattended vs. supervised)
-- [ ] Pi extension for inter-agent coordination (filesystem-based)
-- [ ] Session logging and review tooling
-- [ ] Shareable environment definitions (pi packages + nix flakes)
+- [ ] Task tracking (files in repo, TODO.md, or similar)
+- [ ] Autonomy controls per-worker
+- [ ] Session logging and review
+- [ ] Per-workspace environment definitions (nix flakes, etc.)
+- [ ] Publish as a pi package
