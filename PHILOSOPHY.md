@@ -24,6 +24,10 @@ An environment is an environment, not a "rig." A worker is a worker, not a "pole
 
 Each agent environment is a Nix shell: a declarative, reproducible definition of what tools, credentials, context files, and configuration an agent needs. Nix ensures that "works on my machine" means "works on every machine." But Nix is a means, not the point — if something is simpler without Nix, do it without Nix.
 
+### Extend pi, don't rebuild it
+
+Pi already has extensions, tools, skills, SDK, and TUI. Before building something new, check if pi already supports it — or if it can be added as an extension or skill. Pinix is a layer *on top of* pi, not a replacement for parts of it.
+
 ### Minimal core, maximal extensibility
 
 Follow pi's philosophy: ship a small, opinionated core and let users extend it. Don't bake in features that belong in extensions, skills, or user configuration. The right answer to "should we add X?" is usually "can the user add X themselves?"

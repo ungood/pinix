@@ -8,8 +8,8 @@ Get to the point where pinix is used to develop pinix.
 - [x] Create `flake.nix` with dev environment (pi, tmux, git, coreutils)
 - [x] Create `pinix` shell script — entry point that starts a tmux session with pi in the nix environment
 - [x] Add `.gitignore`
-- [ ] Verify: run `./pinix` from the project root, get a tmux session with pi running, AGENTS.md loaded
-- [ ] Dog-food: use the bootstrapped setup to continue development
+- [x] Verify: run `./pinix` from the project root, get a tmux session with pi running, AGENTS.md loaded
+- [x] Dog-food: use the bootstrapped setup to continue development
 
 ## Milestone 1: Multi-environment basics
 
