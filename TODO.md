@@ -6,30 +6,32 @@
 - [x] Verify: pi runs with pinix extension loaded
 - [x] Dog-food: use pinix to develop pinix
 
-## Milestone 1: Workspace management
+## Milestone 1: Workspace management (bare repo model)
 
-Core extension that manages workspaces and repos.
+Core extension that manages workspaces (bare repos) and worktrees.
 
 - [x] Extension skeleton — loads in pi, registers commands and tools
-- [x] `/workspace:list` — list workspaces and their repos
-- [x] `/workspace:create <name>` — create a workspace directory
-- [x] `/workspace:add <workspace> <url> [name]` — clone a repo into a workspace
-- [x] `workspace` tool — LLM-callable workspace operations (list, create, add, status)
-- [x] Test: run from a workspaces root, create a workspace, add repos, verify status
+- [x] Refactor to bare repo model (ADR-002)
+  - [x] `workspace:list` — scan for bare repos, show their worktrees
+  - [x] `workspace:add <url> [name]` — `git clone --bare` + `git worktree add main`
+  - [x] `workspace:status [workspace]` — show worktree status within a workspace
+  - [x] `workspace` tool — mirrors slash commands for LLM use
+  - [x] Detection: identify bare repos via `git rev-parse --is-bare-repository`
 
 ## Milestone 2: Worktree management
 
-Agents work in git worktrees for isolation.
+Agents work in git worktrees for isolation. Slash commands and tools mirror each other — agents use the same interface humans do.
 
-- [ ] `/ws-worktree <workspace/repo> <branch>` — create a worktree
-- [ ] `worktree` tool — LLM-callable worktree operations
-- [ ] List/clean worktrees per repo
+- [ ] `worktree:add <workspace> <branch> [base]` — create a worktree
+- [ ] `worktree:list [workspace]` — list worktrees in a workspace
+- [ ] `worktree:remove <workspace> <branch>` — remove a worktree
+- [ ] `worktree` tool — mirrors slash commands for LLM use
 
 ## Milestone 3: Multi-agent orchestration
 
 Spin up pi workers in tmux panes.
 
-- [ ] `/ws-spawn <workspace/repo> [branch]` — launch a pi worker in a tmux pane
+- [ ] `/worker:spawn <workspace> <branch> [prompt]` — launch a pi worker in a tmux pane at a worktree
 - [ ] Worker lifecycle management (start, stop, list)
 - [ ] Human can attach to any worker pane
 - [ ] Progress visibility from the main pi session
@@ -42,3 +44,4 @@ Spin up pi workers in tmux panes.
 - [ ] Session logging and review
 - [ ] Per-workspace environment definitions (nix flakes, etc.)
 - [ ] Publish as a pi package
+- [ ] Revisit jj as VCS layer
