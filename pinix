@@ -19,15 +19,5 @@ fi
 if tmux has-session -t "${SESSION_NAME}" 2>/dev/null; then
     exec tmux attach-session -t "${SESSION_NAME}"
 else
-    # Start session with pi in the project root
-    tmux new-session -d -s "${SESSION_NAME}" -c "${PINIX_ROOT}"
-    tmux send-keys -t "${SESSION_NAME}" "cd ${PINIX_ROOT} && pi" Enter
-
-    # Second pane: human shell
-    tmux split-window -h -t "${SESSION_NAME}" -c "${PINIX_ROOT}"
-
-    # Focus the pi pane
-    tmux select-pane -t "${SESSION_NAME}:.0"
-
-    exec tmux attach-session -t "${SESSION_NAME}"
+    exec tmux new-session -s "${SESSION_NAME}" -c "${PINIX_ROOT}"
 fi
