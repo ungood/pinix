@@ -110,6 +110,17 @@ async function listWorkspaces(pi: ExtensionAPI, cwd: string): Promise<WorkspaceI
 	return workspaces;
 }
 
+async function resolveWorkspace(
+	pi: ExtensionAPI,
+	cwd: string,
+	name: string,
+): Promise<{ wsPath: string; error?: string }> {
+	const wsPath = path.join(cwd, name);
+	if (!fs.existsSync(wsPath)) return { wsPath, error: `Workspace not found: ${name}` };
+	if (!(await isBareRepo(pi, wsPath))) return { wsPath, error: `Not a workspace (bare repo): ${name}` };
+	return { wsPath };
+}
+
 function formatWorktreeStatus(wt: WorktreeInfo): string {
 	const dirty = wt.dirty ? " *" : "";
 	return `${wt.name} (${wt.branch}${dirty})`;
@@ -190,13 +201,8 @@ export default function (pi: ExtensionAPI) {
 					if (!params.name) {
 						return { content: [{ type: "text", text: "Error: name required" }], isError: true };
 					}
-					const wsPath = path.join(cwd, params.name);
-					if (!fs.existsSync(wsPath)) {
-						return { content: [{ type: "text", text: `Workspace not found: ${params.name}` }], isError: true };
-					}
-					if (!(await isBareRepo(pi, wsPath))) {
-						return { content: [{ type: "text", text: `Not a workspace (bare repo): ${params.name}` }], isError: true };
-					}
+					const { wsPath, error } = await resolveWorkspace(pi, cwd, params.name);
+					if (error) return { content: [{ type: "text", text: error }], isError: true };
 					const ws = await scanWorkspace(pi, wsPath);
 					return { content: [{ type: "text", text: formatWorkspace(ws) }] };
 				}
@@ -269,17 +275,153 @@ export default function (pi: ExtensionAPI) {
 				ctx.ui.notify("Usage: /workspace:status <name>", "error");
 				return;
 			}
-			const wsPath = path.join(ctx.cwd, name);
-			if (!fs.existsSync(wsPath)) {
-				ctx.ui.notify(`Workspace not found: ${name}`, "error");
-				return;
-			}
-			if (!(await isBareRepo(pi, wsPath))) {
-				ctx.ui.notify(`Not a workspace (bare repo): ${name}`, "error");
+			const { wsPath, error } = await resolveWorkspace(pi, ctx.cwd, name);
+			if (error) {
+				ctx.ui.notify(error, "error");
 				return;
 			}
 			const ws = await scanWorkspace(pi, wsPath);
 			ctx.ui.notify(formatWorkspace(ws), "info");
+		},
+	});
+
+	// --- Tool: worktree management for LLM ---
+
+	pi.registerTool({
+		name: "worktree",
+		label: "Worktree",
+		description: [
+			"Manage worktrees within a workspace.",
+			"Actions:",
+			"  add <workspace> <branch> [base] — create a new branch worktree",
+			"  list <workspace> — list worktrees in a workspace",
+			"  remove <workspace> <branch> — remove a worktree",
+		].join("\n"),
+		parameters: Type.Object({
+			action: StringEnum(["add", "list", "remove"] as const),
+			workspace: Type.Optional(Type.String({ description: "Workspace name" })),
+			branch: Type.Optional(Type.String({ description: "Branch name (for add/remove)" })),
+			base: Type.Optional(Type.String({ description: "Base branch to create from (for add, defaults to default branch)" })),
+		}),
+
+		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+			const cwd = ctx.cwd;
+
+			if (!params.workspace) {
+				return { content: [{ type: "text", text: "Error: workspace required" }], isError: true };
+			}
+			const { wsPath, error } = await resolveWorkspace(pi, cwd, params.workspace);
+			if (error) return { content: [{ type: "text", text: error }], isError: true };
+
+			switch (params.action) {
+				case "add": {
+					if (!params.branch) {
+						return { content: [{ type: "text", text: "Error: branch required" }], isError: true };
+					}
+					const base = params.base || (await getDefaultBranch(pi, wsPath));
+					const result = await exec(pi, "git", ["-C", wsPath, "worktree", "add", "-b", params.branch, params.branch, base]);
+					if (result.code !== 0) {
+						return { content: [{ type: "text", text: `Failed: ${result.stderr.trim()}` }], isError: true };
+					}
+					const wtPath = path.join(wsPath, params.branch);
+					return { content: [{ type: "text", text: `Created worktree ${params.workspace}/${params.branch}/ from ${base}\n${wtPath}` }] };
+				}
+
+				case "list": {
+					const ws = await scanWorkspace(pi, wsPath);
+					return { content: [{ type: "text", text: formatWorkspace(ws) }] };
+				}
+
+				case "remove": {
+					if (!params.branch) {
+						return { content: [{ type: "text", text: "Error: branch required" }], isError: true };
+					}
+					const wtPath = path.join(wsPath, params.branch);
+					if (!fs.existsSync(wtPath)) {
+						return { content: [{ type: "text", text: `Worktree not found: ${params.workspace}/${params.branch}` }], isError: true };
+					}
+					const result = await exec(pi, "git", ["-C", wsPath, "worktree", "remove", params.branch]);
+					if (result.code !== 0) {
+						return { content: [{ type: "text", text: `Failed: ${result.stderr.trim()}` }], isError: true };
+					}
+					return { content: [{ type: "text", text: `Removed worktree ${params.workspace}/${params.branch}/` }] };
+				}
+
+				default:
+					return { content: [{ type: "text", text: `Unknown action: ${params.action}` }], isError: true };
+			}
+		},
+	});
+
+	// --- Worktree slash commands ---
+
+	pi.registerCommand("worktree:add", {
+		description: "Create a worktree: /worktree:add <workspace> <branch> [base]",
+		handler: async (args, ctx) => {
+			const parts = args?.trim().split(/\s+/) || [];
+			if (parts.length < 2) {
+				ctx.ui.notify("Usage: /worktree:add <workspace> <branch> [base]", "error");
+				return;
+			}
+			const [wsName, branch, base] = parts;
+			const { wsPath, error } = await resolveWorkspace(pi, ctx.cwd, wsName);
+			if (error) {
+				ctx.ui.notify(error, "error");
+				return;
+			}
+			const baseBranch = base || (await getDefaultBranch(pi, wsPath));
+			const result = await exec(pi, "git", ["-C", wsPath, "worktree", "add", "-b", branch, branch, baseBranch]);
+			if (result.code !== 0) {
+				ctx.ui.notify(`Failed: ${result.stderr.trim()}`, "error");
+				return;
+			}
+			ctx.ui.notify(`Created worktree ${wsName}/${branch}/ from ${baseBranch}`, "success");
+		},
+	});
+
+	pi.registerCommand("worktree:list", {
+		description: "List worktrees: /worktree:list <workspace>",
+		handler: async (args, ctx) => {
+			const wsName = args?.trim();
+			if (!wsName) {
+				ctx.ui.notify("Usage: /worktree:list <workspace>", "error");
+				return;
+			}
+			const { wsPath, error } = await resolveWorkspace(pi, ctx.cwd, wsName);
+			if (error) {
+				ctx.ui.notify(error, "error");
+				return;
+			}
+			const ws = await scanWorkspace(pi, wsPath);
+			ctx.ui.notify(formatWorkspace(ws), "info");
+		},
+	});
+
+	pi.registerCommand("worktree:remove", {
+		description: "Remove a worktree: /worktree:remove <workspace> <branch>",
+		handler: async (args, ctx) => {
+			const parts = args?.trim().split(/\s+/) || [];
+			if (parts.length < 2) {
+				ctx.ui.notify("Usage: /worktree:remove <workspace> <branch>", "error");
+				return;
+			}
+			const [wsName, branch] = parts;
+			const { wsPath, error } = await resolveWorkspace(pi, ctx.cwd, wsName);
+			if (error) {
+				ctx.ui.notify(error, "error");
+				return;
+			}
+			const wtPath = path.join(wsPath, branch);
+			if (!fs.existsSync(wtPath)) {
+				ctx.ui.notify(`Worktree not found: ${wsName}/${branch}`, "error");
+				return;
+			}
+			const result = await exec(pi, "git", ["-C", wsPath, "worktree", "remove", branch]);
+			if (result.code !== 0) {
+				ctx.ui.notify(`Failed: ${result.stderr.trim()}`, "error");
+				return;
+			}
+			ctx.ui.notify(`Removed worktree ${wsName}/${branch}/`, "success");
 		},
 	});
 }

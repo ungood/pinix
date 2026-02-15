@@ -22,10 +22,10 @@ Core extension that manages workspaces (bare repos) and worktrees.
 
 Agents work in git worktrees for isolation. Slash commands and tools mirror each other — agents use the same interface humans do.
 
-- [ ] `worktree:add <workspace> <branch> [base]` — create a worktree
-- [ ] `worktree:list [workspace]` — list worktrees in a workspace
-- [ ] `worktree:remove <workspace> <branch>` — remove a worktree
-- [ ] `worktree` tool — mirrors slash commands for LLM use
+- [x] `worktree:add <workspace> <branch> [base]` — create a worktree
+- [x] `worktree:list <workspace>` — list worktrees in a workspace
+- [x] `worktree:remove <workspace> <branch>` — remove a worktree
+- [x] `worktree` tool — mirrors slash commands for LLM use
 
 ## Milestone 3: Multi-agent orchestration
 
